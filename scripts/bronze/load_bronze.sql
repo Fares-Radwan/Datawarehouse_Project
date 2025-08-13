@@ -1,228 +1,336 @@
 /*
-=======================================================
-Stored Procedure: Bulk Inser(load) Data Into Tables In 'bronze' schema 
-=======================================================
-Script purpose:
+===============================================================================
+Stored Procedure: Load Bronze Layer (Source -> Bronze)
+===============================================================================
+Script Purpose:
     This stored procedure loads data into the 'bronze' schema from external CSV files. 
     It performs the following actions:
     - Truncates the bronze tables before loading data.
-    - Uses the `BULK INSERT` command to load data from csv Files to bronze tables.
-Parametaers:
-    None.
-     The storge procedure does not accept any prameter or return any values.
+    - Used the BULK INSERT command and the Import Flat File feature 
+                     to load data from CSV files into bronze tables.
+Parameters:
+    None. 
+	  This stored procedure does not accept any parameters or return any values.
+
 Usage Example:
-     EXEC bronze.load_bronze;
-=======================================================
+    EXEC bronze.load_bronze;
+===============================================================================
 */
-CREATE Or ALTER Procedure bronze.load_bronze 
+
+CREATE OR ALTER PROCEDURE silver.load_silver
 AS
-BEGIN 
-BEGIN TRY
+BEGIN
+    BEGIN TRY
+        DECLARE @start_time DATETIME,
+                @end_time DATETIME,
+                @full_start_time DATETIME,
+                @full_end_time DATETIME;
 
- DECLARE @start_time DATETIME , @end_time DATETIME,@full_start_time DATETIME, @full_end_time DATETIME;
+        SET @full_start_time = GETDATE();
 
- SET @full_start_time = GETDATE();
+        PRINT '_______________________________________';
+        PRINT 'Loading Silver Layer';
+        PRINT '_______________________________________';
 
-PRINT '_______________________________________';
-PRINT 'Loading Bronze Layer';
-PRINT '_______________________________________';
+        PRINT '---------------------------------------';
+        PRINT 'Loading CRM Tables';
+        PRINT '---------------------------------------';
 
-PRINT '---------------------------------------';
-PRINT 'Loading CRM Tables';
-PRINT '---------------------------------------';
+        -- CRM Customers
+        SET @start_time = GETDATE();
 
-SET @start_time= GETDATE();
+        PRINT '>> Truncating Table: silver.crm_olist_customers';
+        TRUNCATE TABLE silver.crm_olist_customers;
 
-PRINT '>> Truncating Table:crm_olist_customers';
+        PRINT '>> Inserting Data Into: silver.crm_olist_customers';
+        INSERT INTO silver.crm_olist_customers (
+            customer_id,
+            customer_unique_id,
+            customer_zip_code_prefix,
+            customer_city,
+            customer_state
+        )
+        SELECT
+            customer_id,
+            customer_unique_id,
+            customer_zip_code_prefix,
+            customer_city,
+            UPPER(customer_state) AS customer_state
+        FROM bronze.crm_olist_customers;
 
-Truncate table bronze.crm_olist_customers;
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-PRINT '>> Inserting Data Into:crm_olist_customers';
+        -- CRM Order Reviews
+        SET @start_time = GETDATE();
 
-bulk insert bronze.crm_olist_customers
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_CRM\olist_cust.csv"
-With (
-		firstrow=2,
-		FIELDTERMINATOR=',',
-		TABLOCK
-);
+        PRINT '>> Truncating Table: silver.crm_olist_order_reviews';
+        TRUNCATE TABLE silver.crm_olist_order_reviews;
 
-SET @end_time= GETDATE();
+        PRINT '>> Inserting Data Into: silver.crm_olist_order_reviews';
+        INSERT INTO silver.crm_olist_order_reviews (
+            review_id,
+            order_id,
+            review_score,
+            review_comment_title,
+            review_comment_message,
+            review_creation_date,
+            review_answer_timestamp,
+            review_response_time_days
+        )
+        SELECT
+            review_id,
+            order_id,
+            review_score,
+            CASE WHEN review_comment_title IS NULL THEN 'no comment' ELSE review_comment_title END AS review_comment_title,
+            CASE WHEN review_comment_message IS NULL THEN 'no comment' ELSE review_comment_message END AS review_comment_message,
+            review_creation_date,
+            review_answer_timestamp,
+            DATEDIFF(DAY, review_creation_date, review_answer_timestamp) AS review_response_time_days
+        FROM bronze.crm_olist_order_reviews;
 
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
+        -- CRM Product Category Name Translation
+        SET @start_time = GETDATE();
 
-PRINT '========================================';
-PRINT 'Import File  "olist_order_reviews_dataset.csv" Into bronze.crm_olist_order_reviews';
-PRINT '========================================';
- 
-PRINT '>> Truncating Table: bronze.crm_product_category_name_translation';
+        PRINT '>> Truncating Table: silver.crm_product_category_name_translation';
+        TRUNCATE TABLE silver.crm_product_category_name_translation;
 
-SET @start_time= GETDATE();
+        PRINT '>> Inserting Data Into: silver.crm_product_category_name_translation';
+        INSERT INTO silver.crm_product_category_name_translation (
+            product_category_name,
+            product_category_name_english
+        )
+        SELECT
+            product_category_name,
+            product_category_name_english
+        FROM bronze.crm_product_category_name_translation;
 
-Truncate table bronze.crm_product_category_name_translation;
- 
-PRINT '>> Inserting Data Into: bronze.crm_product_category_name_translation';
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-bulk insert bronze.crm_product_category_name_translation
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_CRM\prod_cat_trans.csv"
-With (
-		firstrow=2,
-		FIELDTERMINATOR=',',
-		TABLOCK
-);
+        PRINT '---------------------------------------';
+        PRINT 'Loading ERP Tables';
+        PRINT '---------------------------------------';
 
-SET @end_time= GETDATE();
+        -- ERP Geolocation
+        SET @start_time = GETDATE();
 
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
+        PRINT '>> Truncating Table: silver.erp_olist_geolocation';
+        TRUNCATE TABLE silver.erp_olist_geolocation;
 
-PRINT '---------------------------------------';
-PRINT 'Loading ERP Tables';
-PRINT '---------------------------------------';
+        PRINT '>> Inserting Data Into: silver.erp_olist_geolocation';
+        INSERT INTO silver.erp_olist_geolocation (
+            geolocation_zip_code_prefix,
+            geolocation_lat,
+            geolocation_lng,
+            geolocation_city,
+            geolocation_state
+        )
+        SELECT
+            geolocation_zip_code_prefix,
+            geolocation_lat,
+            geolocation_lng,
+            LOWER(geolocation_city) AS geolocation_city,
+            UPPER(geolocation_state) AS geolocation_state
+        FROM bronze.erp_olist_geolocation;
 
-SET @start_time= GETDATE();
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-PRINT '>> Truncating Table: bronze.erp_olist_geolocation';
+        -- ERP Order Items
+        SET @start_time = GETDATE();
 
-Truncate table bronze.erp_olist_geolocation;
+        PRINT '>> Truncating Table: silver.erp_olist_order_items';
+        TRUNCATE TABLE silver.erp_olist_order_items;
 
-PRINT '>> Inserting Data Into: bronze.erp_olist_geolocation';
+        PRINT '>> Inserting Data Into: silver.erp_olist_order_items';
+        INSERT INTO silver.erp_olist_order_items (
+            order_id,
+            order_item_id,
+            product_id,
+            seller_id,
+            shipping_limit_date,
+            price,
+            freight_value,
+            total_price
+        )
+        SELECT
+            order_id,
+            order_item_id,
+            product_id,
+            seller_id,
+            shipping_limit_date,
+            price,
+            freight_value,
+            (price + freight_value) AS total_price
+        FROM bronze.erp_olist_order_items;
 
-bulk insert bronze.erp_olist_geolocation
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_ERP\olist_geolocation.csv"
-With (
-		firstrow=2,
-		FIELDTERMINATOR=',',
-		TABLOCK
-);
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-SET @end_time= GETDATE();
+        -- ERP Order Payments
+        SET @start_time = GETDATE();
 
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
+        PRINT '>> Truncating Table: silver.erp_olist_order_payments';
+        TRUNCATE TABLE silver.erp_olist_order_payments;
 
-SET @start_time= GETDATE();
+        PRINT '>> Inserting Data Into: silver.erp_olist_order_payments';
+        INSERT INTO silver.erp_olist_order_payments (
+            order_id,
+            payment_sequential,
+            payment_type,
+            payment_installments,
+            payment_value,
+            installment_value,
+            payment_value_category
+        )
+        SELECT
+            order_id,
+            payment_sequential,
+            REPLACE(payment_type, '_', ' ') AS payment_type,
+            payment_installments,
+            payment_value,
+            CASE
+                WHEN payment_installments > 0 THEN CAST((payment_value / payment_installments) AS DECIMAL(10, 2))
+                ELSE 0
+            END AS installment_value,
+            CASE
+                WHEN payment_value < 100 THEN 'low'
+                WHEN payment_value BETWEEN 100 AND 500 THEN 'medium'
+                ELSE 'high'
+            END AS payment_value_category
+        FROM bronze.erp_olist_order_payments;
 
-PRINT '>> Truncating Table: bronze.erp_olist_order_items';
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-Truncate table bronze.erp_olist_order_items;
- 
-PRINT '>> Inserting Data Into: bronze.erp_olist_order_items';
+        -- ERP Orders
+        SET @start_time = GETDATE();
 
-bulk insert bronze.erp_olist_order_items
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_ERP\olist_ord_items.csv"
-With (
-		firstrow=2,
-		FIELDTERMINATOR=',',
-		TABLOCK
-);
+        PRINT '>> Truncating Table: silver.erp_olist_orders';
+        TRUNCATE TABLE silver.erp_olist_orders;
 
-SET @end_time= GETDATE();
+        PRINT '>> Inserting Data Into: silver.erp_olist_orders';
+        INSERT INTO silver.erp_olist_orders (
+            order_id,
+            customer_id,
+            order_status,
+            order_purchase_timestamp,
+            order_approved_at,
+            order_delivered_carrier_date,
+            order_delivered_customer_date,
+            order_estimated_delivery_date,
+            approval_days,
+            shipping_days,
+            delivery_days,
+            is_late
+        )
+        SELECT
+            order_id,
+            customer_id,
+            order_status,
+            order_purchase_timestamp,
+            order_approved_at,
+            order_delivered_carrier_date,
+            order_delivered_customer_date,
+            order_estimated_delivery_date,
+            DATEDIFF(DAY, order_purchase_timestamp, order_approved_at) AS approval_days,
+            DATEDIFF(DAY, order_approved_at, order_delivered_carrier_date) AS shipping_days,
+            DATEDIFF(DAY, order_delivered_carrier_date, order_delivered_customer_date) AS delivery_days,
+            CASE
+                WHEN order_delivered_customer_date > order_estimated_delivery_date THEN 1
+                ELSE 0
+            END AS is_late
+        FROM bronze.erp_olist_orders;
 
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-SET @start_time= GETDATE();
+        -- ERP Products
+        SET @start_time = GETDATE();
 
-PRINT '>> Truncating Table: bronze.erp_olist_order_payments';
+        PRINT '>> Truncating Table: silver.erp_olist_products';
+        TRUNCATE TABLE silver.erp_olist_products;
 
-Truncate table bronze.erp_olist_order_payments; 
+        PRINT '>> Inserting Data Into: silver.erp_olist_products';
+        INSERT INTO silver.erp_olist_products (
+            product_id,
+            product_category_name,
+            product_name_lenght,
+            product_description_lenght,
+            product_photos_qty,
+            product_weight_g,
+            product_length_cm,
+            product_height_cm,
+            product_width_cm,
+            product_volume_l,
+            weight_category
+        )
+        SELECT
+            product_id,
+            product_category_name,
+            product_name_lenght,
+            product_description_lenght,
+            product_photos_qty,
+            product_weight_g,
+            product_length_cm,
+            product_height_cm,
+            product_width_cm,
+            CAST((product_length_cm * product_height_cm * product_width_cm) / 1000.0 AS DECIMAL(10, 2)) AS product_volume_l,
+            CASE
+                WHEN product_weight_g < 500 THEN 'light'
+                WHEN product_weight_g BETWEEN 500 AND 2000 THEN 'medium'
+                ELSE 'heavy'
+            END AS weight_category
+        FROM bronze.erp_olist_products;
 
-PRINT '>> Inserting Data Into: bronze.erp_olist_order_payments';
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-bulk insert bronze.erp_olist_order_payments
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_ERP\olist_ord_pay.csv"
-With (
-		firstrow=2,
-		FIELDTERMINATOR=',',
-		TABLOCK
-);
-SET @end_time= GETDATE();
+        -- ERP Sellers
+        SET @start_time = GETDATE();
 
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
+        PRINT '>> Truncating Table: silver.erp_olist_sellers';
+        TRUNCATE TABLE silver.erp_olist_sellers;
 
-SET @start_time= GETDATE();
+        PRINT '>> Inserting Data Into: silver.erp_olist_sellers';
+        INSERT INTO silver.erp_olist_sellers (
+            seller_id,
+            seller_zip_code_prefix,
+            seller_city,
+            seller_state
+        )
+        SELECT
+            seller_id,
+            seller_zip_code_prefix,
+            seller_city,
+            seller_state
+        FROM bronze.erp_olist_sellers;
 
-PRINT '>> Truncating Table: bronze.erp_olist_orders';
+        SET @end_time = GETDATE();
+        PRINT 'Load Duration: ' + CAST(DATEDIFF(SECOND, @start_time, @end_time) AS NVARCHAR) + ' Seconds';
+        PRINT '-------------';
 
-Truncate table bronze.erp_olist_orders; 
+        SET @full_end_time = GETDATE();
 
-PRINT '>> Inserting Data Into: bronze.erp_olist_orders';
-
-bulk insert bronze.erp_olist_orders
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_ERP\olist_ord.csv"
-With (
-		firstrow=2,
-		FIELDTERMINATOR=',',
-		TABLOCK
-);
-
-SET @end_time= GETDATE();
-
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
-
-SET @start_time= GETDATE();
-
-PRINT '>> Truncating Table: bronze.erp_olist_products';
-
-Truncate table bronze.erp_olist_products;
- 
-PRINT '>> Inserting Data Into: bronze.erp_olist_products';
-
-bulk insert bronze.erp_olist_products
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_ERP\olist_prod.csv"
-With (
-		firstrow=2,
-		FIELDTERMINATOR=',',
-		TABLOCK
-);
-SET @end_time= GETDATE();
-
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
-
-SET @start_time= GETDATE();
-
-PRINT '>> Truncating Table: bronze.erp_olist_sellers';
-
-Truncate table bronze.erp_olist_sellers;
-
-PRINT '>> Inserting Data Into: bronze.erp_olist_sellers';
-
-bulk insert bronze.erp_olist_sellers
-FROM "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_ERP\olist_sellers.csv"
-With(
-      Firstrow=2,
-	  FIELDTERMINATOR=',',
-	  TABLOCK
-)
-
-SET @end_time= GETDATE();
-
-PRINT 'Load Duration:'+ CAST(DATEDIFF(second,@start_time,@end_time) AS Nvarchar) +' Seconds';
-PRINT '-------------';
-
-SET @full_end_time=GETDATE();
-
-PRINT '=========================================='
-		PRINT 'Loading Bronze Layer is Completed';
+        PRINT '==========================================';
+        PRINT 'Loading Bronze Layer is Completed';
         PRINT '   - Total Load Duration: ' + CAST(DATEDIFF(SECOND, @full_start_time, @full_end_time) AS NVARCHAR) + ' Seconds';
-		PRINT '=========================================='
-
-END TRY
-
+        PRINT '==========================================';
+    END TRY
     BEGIN CATCH
-		PRINT '=========================================='
-		PRINT 'ERROR OCCURED DURING LOADING BRONZE LAYER'
-		PRINT 'Error Message' + ERROR_MESSAGE();
-		PRINT 'Error Message' + CAST (ERROR_NUMBER() AS NVARCHAR);
-		PRINT 'Error Message' + CAST (ERROR_STATE() AS NVARCHAR);
-		PRINT '=========================================='
-	END CATCH
-END
-
-
-
+        PRINT '==========================================';
+        PRINT 'ERROR OCCURRED DURING LOADING BRONZE LAYER';
+        PRINT 'Error Message: ' + ERROR_MESSAGE();
+        PRINT 'Error Number: ' + CAST(ERROR_NUMBER() AS NVARCHAR);
+        PRINT 'Error State: ' + CAST(ERROR_STATE() AS NVARCHAR);
+        PRINT '==========================================';
+    END CATCH
+END;
