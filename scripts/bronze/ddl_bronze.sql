@@ -10,6 +10,9 @@ Script Purpose:
 */
 
 
+USE Olist_Ecommerce_DWH;
+GO
+
 IF OBJECT_ID('bronze.crm_olist_customers', 'U') IS NOT NULL
     DROP TABLE bronze.crm_olist_customers;
 GO
@@ -23,7 +26,10 @@ CREATE TABLE bronze.crm_olist_customers (
 );
 GO
 
-IF OBJECT_ID('bronze.crm_olist_order_reviews', 'U') IS NOT NULL
+-- Imported the file instead of creating the table manually:
+-- Import Flat File -> "E:\Programming\Projects\SQL projects\Olist_Ecommerce_DWH\Dataset\Source_CRM\olist_ord_rev.csv"
+ 
+/* F OBJECT_ID('bronze.crm_olist_order_reviews', 'U') IS NOT NULL
     DROP TABLE bronze.crm_olist_order_reviews;
 GO
 
@@ -37,6 +43,8 @@ CREATE TABLE bronze.crm_olist_order_reviews (
     review_answer_timestamp DATETIME
 );
 GO
+*/
+
 
 IF OBJECT_ID('bronze.crm_product_category_name_translation', 'U') IS NOT NULL
     DROP TABLE bronze.crm_product_category_name_translation;
@@ -132,3 +140,4 @@ CREATE TABLE bronze.erp_olist_sellers (
     seller_city NVARCHAR(50),
     seller_state NVARCHAR(50)
 );
+GO
