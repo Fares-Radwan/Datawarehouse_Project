@@ -84,8 +84,8 @@ BEGIN
             review_id,
             order_id,
             review_score,
-            CASE WHEN review_comment_title IS NULL THEN 'no comment' ELSE review_comment_title END AS review_comment_title,
-            CASE WHEN review_comment_message IS NULL THEN 'no comment' ELSE review_comment_message END AS review_comment_message,
+            CASE WHEN review_comment_title IS NULL THEN 'no comment' ELSE LOWER(review_comment_title) END AS review_comment_title,
+            CASE WHEN review_comment_message IS NULL THEN 'no comment' ELSE LOWER(review_comment_message) END AS review_comment_message,
             review_creation_date,
             review_answer_timestamp,
             DATEDIFF(DAY, review_creation_date, review_answer_timestamp) AS review_response_time_days
@@ -335,4 +335,3 @@ BEGIN
         PRINT '==========================================';
     END CATCH
 END;
-
